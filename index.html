@@ -3,183 +3,429 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimalist P2P Chess</title>
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://unpkg.com/chess.js@0.10.3/chess.js"></script>
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
-    
+    <title>Supa Smooth Board Game</title>
     <style>
-        body { font-family: 'Inter', sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        #game-container { width: 400px; max-width: 90vw; }
-        .controls { background: #2a2a2a; padding: 20px; border-radius: 12px; margin-bottom: 20px; width: 100%; box-sizing: border-box; text-align: center; }
-        input { background: #333; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; margin: 5px; width: 80%; }
-        button { background: #4a90e2; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 5px; transition: 0.2s; }
-        button:hover { background: #357abd; }
-        button.secondary { background: #444; }
-        #status { margin-top: 10px; font-size: 0.9em; color: #aaa; }
-        .peer-id-display { font-weight: bold; color: #4a90e2; cursor: pointer; }
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: rgba(30, 41, 59, 0.7);
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --board-light: #cbd5e1;
+            --board-dark: #475569;
+            --highlight: rgba(52, 211, 153, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at top right, #1e1b4b, var(--bg-color));
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism Containers */
+        .glass-panel {
+            background: var(--surface-color);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            padding: 20px;
+        }
+
+        /* Layout */
+        #app {
+            display: flex;
+            gap: 20px;
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: appStart 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes appStart {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Left Panel: Stats & Controls */
+        #left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .stat-box {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+            transform: scale(1.02);
+        }
+
+        #room-id-display {
+            font-size: 24px;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            text-align: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        /* Center: The Board */
+        #center-panel {
+            flex: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #board {
+            width: 500px;
+            height: 500px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border: 4px solid var(--board-dark);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            transition: all 0.5s ease;
+        }
+
+        /* Making the board bigger when playing */
+        #board.playing {
+            width: 650px;
+            height: 650px;
+        }
+
+        .square {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .light { background-color: var(--board-light); }
+        .dark { background-color: var(--board-dark); }
+
+        /* Highlight for valid moves */
+        .highlight::after {
+            content: '';
+            position: absolute;
+            width: 30%;
+            height: 30%;
+            background-color: var(--highlight);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.7; }
+        }
+
+        /* Pieces & Smooth Animation */
+        .piece {
+            width: 80%;
+            height: 80%;
+            background: #fff;
+            border-radius: 50%; /* Placeholder for actual piece */
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.2), 0 5px 10px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 10;
+        }
+        
+        .piece.enemy {
+            background: #111;
+        }
+
+        /* Right Panel: Chat */
+        #right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #chat-messages {
+            flex-grow: 1;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .msg {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #chat-input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            outline: none;
+        }
+
+        /* Modals & Winning Animations */
+        #win-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        #win-modal h1 {
+            font-size: 4rem;
+            color: gold;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.1); opacity: 0; }
+            60% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
     </style>
 </head>
 <body>
 
-<div id="game-container">
-    <div class="controls">
-        <h2 style="margin-top:0">Chess P2P</h2>
-        
-        <div id="setup-section">
-            <p>Your ID: <span id="my-id" class="peer-id-display">Connecting...</span></p>
-            <input type="text" id="join-id" placeholder="Paste Opponent ID here">
-            <button onclick="connectToPeer()">Join Friend</button>
-            <hr style="border:0; border-top:1px solid #444; margin:15px 0;">
-            <button class="secondary" onclick="startBotGame()">Play vs Bot</button>
+    <div id="app">
+        <div id="left-panel" class="glass-panel">
+            <h2>Game Hub</h2>
+            <button class="btn" onclick="generateRoom()">Create Match</button>
+            <div id="room-id-display">ID: ----</div>
+            
+            <h3 style="margin-top: 20px;">Your History</h3>
+            <div class="stat-box">
+                <span>Wins:</span>
+                <span id="win-count">0</span>
+            </div>
+            <div class="stat-box">
+                <span>Losses:</span>
+                <span id="loss-count">0</span>
+            </div>
+            <button class="btn" style="background: #ef4444;" onclick="triggerWin(true)">Test Win Animation</button>
         </div>
 
-        <div id="game-info" style="display:none">
-            <p id="turn-indicator">Waiting for move...</p>
-            <button class="secondary" onclick="location.reload()">New Game / Disconnect</button>
+        <div id="center-panel">
+            <div id="board" class="playing">
+                </div>
         </div>
-        
-        <div id="status">Ready to play.</div>
+
+        <div id="right-panel" class="glass-panel">
+            <h3>Match Chat</h3>
+            <div id="chat-messages">
+                <div class="msg">System: Welcome to the match!</div>
+            </div>
+            <div id="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="handleChatPress(event)">
+                <button class="btn" onclick="sendChat()">Send</button>
+            </div>
+        </div>
     </div>
 
-    <div id="myBoard"></div>
-</div>
+    <div id="win-modal">
+        <h1 id="win-text">YOU WIN!</h1>
+        <button class="btn" style="font-size: 1.5rem; padding: 15px 30px;" onclick="rematch()">Rematch</button>
+    </div>
 
-<script>
-    let board = null;
-    let game = new Chess();
-    let peer = new Peer(); // Generates a random ID automatically
-    let conn = null;
-    let myColor = 'w';
-    let isBotMode = false;
+    <script>
+        // --- 1. Short ID Generator (4 Chars Max) ---
+        function generateRoom() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let id = '';
+            for(let i = 0; i < 4; i++) {
+                id += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById('room-id-display').innerText = `ID: ${id}`;
+            addChatMsg(`System`, `Created room ${id}. Waiting for opponent...`);
+            startGame();
+        }
 
-    // --- PeerJS Setup ---
-    peer.on('open', (id) => {
-        document.getElementById('my-id').innerText = id;
-    });
+        // --- 2. Board Setup & Highlight Animations ---
+        const board = document.getElementById('board');
+        let selectedSquare = null;
 
-    // Handle incoming connections
-    peer.on('connection', (c) => {
-        conn = c;
-        myColor = 'w'; // Host is white
-        setupGame();
-        initConnection();
-    });
+        function createBoard() {
+            board.innerHTML = '';
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    
+                    // Add a mock piece to show animations
+                    if (row === 6 && col === 4) {
+                        const piece = document.createElement('div');
+                        piece.classList.add('piece');
+                        square.appendChild(piece);
+                    }
 
-    function connectToPeer() {
-        const targetId = document.getElementById('join-id').value;
-        if (!targetId) return alert("Enter an ID");
-        conn = peer.connect(targetId);
-        myColor = 'b'; // Joiner is black
-        setupGame();
-        initConnection();
-    }
-
-    function initConnection() {
-        conn.on('open', () => {
-            document.getElementById('setup-section').style.display = 'none';
-            document.getElementById('game-info').style.display = 'block';
-            updateStatus("Connected! Game started.");
-            if(myColor === 'b') board.orientation('black');
-        });
-
-        conn.on('data', (data) => {
-            game.move(data);
-            board.position(game.fen());
-            updateStatus();
-        });
-    }
-
-    // --- Game Logic ---
-    function onDragStart(source, piece, position, orientation) {
-        if (game.game_over()) return false;
-        
-        // Only pick up pieces for the player's color
-        if (!isBotMode) {
-            if ((myColor === 'w' && piece.search(/^b/) !== -1) ||
-                (myColor === 'b' && piece.search(/^w/) !== -1)) {
-                return false;
+                    square.onclick = () => handleSquareClick(square);
+                    board.appendChild(square);
+                }
             }
         }
+
+        function handleSquareClick(square) {
+            // Remove previous highlights
+            document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
+
+            if (square.children.length > 0) {
+                // If clicking a piece, highlight potential moves (mock logic)
+                selectedSquare = square;
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                
+                // Highlight spaces in front of it
+                const target = document.querySelector(`.square[data-row="${row-1}"][data-col="${col}"]`);
+                const target2 = document.querySelector(`.square[data-row="${row-2}"][data-col="${col}"]`);
+                if(target) target.classList.add('highlight');
+                if(target2) target2.classList.add('highlight');
+                
+            } else if (square.classList.contains('highlight') && selectedSquare) {
+                // MOVE ANIMATION
+                const piece = selectedSquare.children[0];
+                square.appendChild(piece); // Moves DOM element
+                selectedSquare = null;
+                document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
+            }
+        }
+
+        // --- 3. Chat Feature ---
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(text) {
+                addChatMsg('You', text);
+                input.value = '';
+            }
+        }
+
+        function handleChatPress(e) {
+            if(e.key === 'Enter') sendChat();
+        }
+
+        function addChatMsg(sender, text) {
+            const chatBox = document.getElementById('chat-messages');
+            const msgObj = document.createElement('div');
+            msgObj.classList.add('msg');
+            msgObj.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chatBox.appendChild(msgObj);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // --- 4. Browser LocalStorage for Win/Loss History ---
+        let stats = JSON.parse(localStorage.getItem('gameStats')) || { wins: 0, losses: 0 };
         
-        // Don't allow move if it's not your turn
-        if ((game.turn() === 'w' && myColor === 'b') || 
-            (game.turn() === 'b' && myColor === 'w')) return false;
-    }
-
-    function onDrop(source, target) {
-        let move = game.move({
-            from: source,
-            to: target,
-            promotion: 'q'
-        });
-
-        if (move === null) return 'snapback';
-
-        updateStatus();
-
-        // Send move to peer
-        if (conn && conn.open) {
-            conn.send(move);
+        function updateStatsDisplay() {
+            document.getElementById('win-count').innerText = stats.wins;
+            document.getElementById('loss-count').innerText = stats.losses;
         }
 
-        // If bot mode, trigger bot response
-        if (isBotMode && !game.game_over()) {
-            window.setTimeout(makeRandomMove, 250);
-        }
-    }
-
-    function updateStatus() {
-        let status = '';
-        let moveColor = (game.turn() === 'w') ? 'White' : 'Black';
-
-        if (game.in_checkmate()) {
-            status = 'Game over, ' + moveColor + ' is in checkmate.';
-        } else if (game.in_draw()) {
-            status = 'Game over, drawn position';
-        } else {
-            status = moveColor + ' to move';
-            if (game.in_check()) status += ', ' + moveColor + ' is in check';
+        function saveStats() {
+            localStorage.setItem('gameStats', JSON.stringify(stats));
+            updateStatsDisplay();
         }
 
-        document.getElementById('status').innerText = status;
-    }
+        // --- 5. Winning / Starting / Rematch Logic ---
+        function startGame() {
+            document.getElementById('board').classList.add('playing');
+            createBoard();
+        }
 
-    function setupGame() {
-        const config = {
-            draggable: true,
-            position: 'start',
-            onDragStart: onDragStart,
-            onDrop: onDrop,
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-        };
-        board = ChessBoard('myBoard', config);
-        updateStatus();
-    }
+        function triggerWin(isWin) {
+            if(isWin) {
+                stats.wins++;
+                document.getElementById('win-text').innerText = "YOU WIN!";
+                document.getElementById('win-text').style.color = "gold";
+            } else {
+                stats.losses++;
+                document.getElementById('win-text').innerText = "YOU LOSE";
+                document.getElementById('win-text').style.color = "#ef4444";
+            }
+            saveStats();
+            document.getElementById('win-modal').style.display = 'flex';
+        }
 
-    // --- Bot Logic ---
-    function startBotGame() {
-        isBotMode = true;
-        myColor = 'w';
-        document.getElementById('setup-section').style.display = 'none';
-        document.getElementById('game-info').style.display = 'block';
-        setupGame();
-    }
+        function rematch() {
+            document.getElementById('win-modal').style.display = 'none';
+            addChatMsg('System', 'A rematch has started!');
+            createBoard(); // Reset board
+        }
 
-    function makeRandomMove() {
-        let possibleMoves = game.moves();
-        if (possibleMoves.length === 0) return;
-
-        let randomIdx = Math.floor(Math.random() * possibleMoves.length);
-        game.move(possibleMoves[randomIdx]);
-        board.position(game.fen());
-        updateStatus();
-    }
-
-    // Start UI
-    setupGame();
-</script>
+        // Initialize on load
+        createBoard();
+        updateStatsDisplay();
+    </script>
 </body>
 </html>
