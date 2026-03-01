@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supa Smooth Board Game</title>
+    <title>Chess Online Multiplayer</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -11,18 +12,12 @@
             --accent-color: #3b82f6;
             --accent-hover: #2563eb;
             --text-main: #f8fafc;
-            --text-muted: #94a3b8;
             --board-light: #cbd5e1;
             --board-dark: #475569;
             --highlight: rgba(52, 211, 153, 0.6);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 
         body {
             background-color: var(--bg-color);
@@ -35,7 +30,6 @@
             overflow: hidden;
         }
 
-        /* Glassmorphism Containers */
         .glass-panel {
             background: var(--surface-color);
             backdrop-filter: blur(12px);
@@ -46,211 +40,75 @@
             padding: 20px;
         }
 
-        /* Layout */
         #app {
-            display: flex;
-            gap: 20px;
-            width: 90%;
-            max-width: 1200px;
-            height: 90vh;
-            opacity: 0;
-            transform: translateY(20px);
+            display: flex; gap: 20px; width: 90%; max-width: 1200px; height: 90vh;
             animation: appStart 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        @keyframes appStart {
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes appStart { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Left Panel: Stats & Controls */
-        #left-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .stat-box {
-            display: flex;
-            justify-content: space-between;
-            background: rgba(0,0,0,0.2);
-            padding: 10px;
-            border-radius: 8px;
-            font-weight: bold;
-        }
+        /* Left Panel */
+        #left-panel { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        
+        .controls { display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; }
+        .row { display: flex; gap: 10px; }
+        .row input { flex: 1; padding: 10px; border-radius: 8px; border: none; text-transform: uppercase; text-align: center; font-weight: bold; }
 
         .btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: all 0.2s ease;
+            background: var(--accent-color); color: white; border: none; padding: 12px;
+            border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.2s; flex: 1;
         }
+        .btn:hover { background: var(--accent-hover); transform: scale(1.02); }
+        .btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
 
-        .btn:hover {
-            background: var(--accent-hover);
-            transform: scale(1.02);
-        }
+        #status-display { text-align: center; font-weight: bold; color: #34d399; padding: 10px; }
 
-        #room-id-display {
-            font-size: 24px;
-            letter-spacing: 2px;
-            color: var(--accent-color);
-            text-align: center;
-            background: rgba(0,0,0,0.3);
-            border-radius: 8px;
-            padding: 10px;
-        }
-
-        /* Center: The Board */
-        #center-panel {
-            flex: 2;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+        /* Center Board */
+        #center-panel { flex: 2; display: flex; justify-content: center; align-items: center; flex-direction: column; gap: 10px; }
+        
+        #turn-indicator { font-size: 24px; font-weight: bold; opacity: 0; transition: opacity 0.3s; }
 
         #board {
-            width: 500px;
-            height: 500px;
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
-            border: 4px solid var(--board-dark);
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            transition: all 0.5s ease;
+            width: 500px; height: 500px; display: grid; grid-template-columns: repeat(8, 1fr);
+            border: 4px solid var(--board-dark); border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            transition: all 0.5s ease; pointer-events: none; /* Disabled until game starts */
         }
+        #board.playing { width: 600px; height: 600px; pointer-events: auto; }
 
-        /* Making the board bigger when playing */
-        #board.playing {
-            width: 650px;
-            height: 650px;
-        }
-
-        .square {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            cursor: pointer;
-        }
-
+        .square { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; cursor: pointer; }
         .light { background-color: var(--board-light); }
         .dark { background-color: var(--board-dark); }
 
-        /* Highlight for valid moves */
         .highlight::after {
-            content: '';
-            position: absolute;
-            width: 30%;
-            height: 30%;
-            background-color: var(--highlight);
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
+            content: ''; position: absolute; width: 30%; height: 30%;
+            background-color: var(--highlight); border-radius: 50%; animation: pulse 1.5s infinite;
         }
+        @keyframes pulse { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.2); opacity: 1; } }
 
-        @keyframes pulse {
-            0% { transform: scale(0.9); opacity: 0.7; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.9); opacity: 0.7; }
-        }
-
-        /* Pieces & Smooth Animation */
         .piece {
-            width: 80%;
-            height: 80%;
-            background: #fff;
-            border-radius: 50%; /* Placeholder for actual piece */
+            width: 80%; height: 80%; border-radius: 50%; z-index: 10;
             box-shadow: inset -5px -5px 10px rgba(0,0,0,0.2), 0 5px 10px rgba(0,0,0,0.5);
             transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-            z-index: 10;
         }
+        .piece.p1 { background: #f8fafc; } /* Player 1 is White */
+        .piece.p2 { background: #ef4444; } /* Player 2 is Red */
+
+        /* Right Panel Chat */
+        #right-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        #chat-messages { flex-grow: 1; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .msg { background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 12px; font-size: 14px; animation: popIn 0.3s ease; }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
         
-        .piece.enemy {
-            background: #111;
-        }
+        .chat-input-container { display: flex; gap: 10px; }
+        .chat-input-container input { flex-grow: 1; padding: 10px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: white; outline: none; }
 
-        /* Right Panel: Chat */
-        #right-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        #chat-messages {
-            flex-grow: 1;
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            padding: 10px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .msg {
-            background: rgba(255,255,255,0.1);
-            padding: 8px 12px;
-            border-radius: 12px;
-            font-size: 14px;
-            animation: popIn 0.3s ease;
-        }
-
-        @keyframes popIn {
-            0% { opacity: 0; transform: scale(0.9); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-
-        #chat-input-container {
-            display: flex;
-            gap: 10px;
-        }
-
-        #chat-input {
-            flex-grow: 1;
-            padding: 10px;
-            border-radius: 8px;
-            border: none;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            outline: none;
-        }
-
-        /* Modals & Winning Animations */
+        /* Modal */
         #win-modal {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 100;
-            backdrop-filter: blur(5px);
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 100; backdrop-filter: blur(5px);
         }
-
-        #win-modal h1 {
-            font-size: 4rem;
-            color: gold;
-            margin-bottom: 20px;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-            animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes bounceIn {
-            0% { transform: scale(0.1); opacity: 0; }
-            60% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(1); }
-        }
+        #win-modal h1 { font-size: 4rem; margin-bottom: 20px; animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes bounceIn { 0% { transform: scale(0.1); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); } }
 
     </style>
 </head>
@@ -259,173 +117,282 @@
     <div id="app">
         <div id="left-panel" class="glass-panel">
             <h2>Game Hub</h2>
-            <button class="btn" onclick="generateRoom()">Create Match</button>
-            <div id="room-id-display">ID: ----</div>
             
-            <h3 style="margin-top: 20px;">Your History</h3>
-            <div class="stat-box">
-                <span>Wins:</span>
-                <span id="win-count">0</span>
+            <div class="controls" id="setup-controls">
+                <button class="btn" id="btn-create" onclick="createRoom()">Create Match</button>
+                <div style="text-align: center; margin: 5px 0;">OR</div>
+                <div class="row">
+                    <input type="text" id="join-id" placeholder="4-CHAR ID" maxlength="4">
+                    <button class="btn" id="btn-join" onclick="joinRoom()">Join Match</button>
+                </div>
             </div>
-            <div class="stat-box">
-                <span>Losses:</span>
-                <span id="loss-count">0</span>
+
+            <div id="status-display">Not Connected</div>
+            
+            <h3 style="margin-top: 20px;">Your Local History</h3>
+            <div style="display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+                <span>Wins:</span><span id="win-count">0</span>
             </div>
-            <button class="btn" style="background: #ef4444;" onclick="triggerWin(true)">Test Win Animation</button>
+            <div style="display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin-top: 5px;">
+                <span>Losses:</span><span id="loss-count">0</span>
+            </div>
+            
+            <button class="btn" style="background: #ef4444; margin-top: 20px;" onclick="declareWinner(true)">I Won! (End Game)</button>
         </div>
 
         <div id="center-panel">
-            <div id="board" class="playing">
-                </div>
+            <div id="turn-indicator">Waiting for opponent...</div>
+            <div id="board"></div>
         </div>
 
         <div id="right-panel" class="glass-panel">
             <h3>Match Chat</h3>
             <div id="chat-messages">
-                <div class="msg">System: Welcome to the match!</div>
+                <div class="msg">System: Welcome! Create or join a room.</div>
             </div>
-            <div id="chat-input-container">
-                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="handleChatPress(event)">
-                <button class="btn" onclick="sendChat()">Send</button>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="handleChatPress(event)" disabled>
+                <button class="btn" id="btn-send-chat" onclick="sendChat()" disabled>Send</button>
             </div>
         </div>
     </div>
 
     <div id="win-modal">
         <h1 id="win-text">YOU WIN!</h1>
-        <button class="btn" style="font-size: 1.5rem; padding: 15px 30px;" onclick="rematch()">Rematch</button>
+        <button class="btn" style="font-size: 1.5rem; padding: 15px 30px;" onclick="closeModal()">Close</button>
     </div>
 
     <script>
-        // --- 1. Short ID Generator (4 Chars Max) ---
-        function generateRoom() {
+        // --- 1. Multiplayer Networking Logic (PeerJS) ---
+        let peer = null;
+        let conn = null;
+        let myPlayerNum = 0; // 1 (White) or 2 (Red)
+        let isMyTurn = false;
+        const APP_PREFIX = 'supa-smooth-game-v1-'; // Prevents connecting to random strangers' apps
+
+        function generateShortId() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let id = '';
-            for(let i = 0; i < 4; i++) {
-                id += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            document.getElementById('room-id-display').innerText = `ID: ${id}`;
-            addChatMsg(`System`, `Created room ${id}. Waiting for opponent...`);
-            startGame();
+            return Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
         }
 
-        // --- 2. Board Setup & Highlight Animations ---
-        const board = document.getElementById('board');
-        let selectedSquare = null;
+        function createRoom() {
+            const shortId = generateShortId();
+            const fullId = APP_PREFIX + shortId;
+            
+            document.getElementById('status-display').innerText = `Creating room...`;
+            disableControls();
 
-        function createBoard() {
-            board.innerHTML = '';
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const square = document.createElement('div');
-                    square.classList.add('square');
-                    square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
-                    square.dataset.row = row;
-                    square.dataset.col = col;
-                    
-                    // Add a mock piece to show animations
-                    if (row === 6 && col === 4) {
-                        const piece = document.createElement('div');
-                        piece.classList.add('piece');
-                        square.appendChild(piece);
-                    }
+            peer = new Peer(fullId);
+            peer.on('open', id => {
+                document.getElementById('status-display').innerText = `Room Code: ${shortId}\nWaiting for opponent...`;
+                addChatMsg('System', `Created room ${shortId}. Waiting...`);
+                myPlayerNum = 1; // Host is Player 1 (White)
+            });
 
-                    square.onclick = () => handleSquareClick(square);
-                    board.appendChild(square);
+            peer.on('connection', connection => {
+                conn = connection;
+                setupConnection();
+                startGame();
+            });
+        }
+
+        function joinRoom() {
+            const shortId = document.getElementById('join-id').value.toUpperCase();
+            if(shortId.length !== 4) return alert("Please enter a 4-character ID.");
+            
+            disableControls();
+            document.getElementById('status-display').innerText = `Joining ${shortId}...`;
+
+            peer = new Peer(); // Guest doesn't need a specific ID
+            peer.on('open', id => {
+                conn = peer.connect(APP_PREFIX + shortId);
+                conn.on('open', () => {
+                    myPlayerNum = 2; // Guest is Player 2 (Red)
+                    setupConnection();
+                    startGame();
+                });
+                conn.on('error', err => {
+                    alert("Could not connect. Is the ID correct?");
+                    enableControls();
+                });
+            });
+        }
+
+        function setupConnection() {
+            document.getElementById('status-display').innerText = `Connected! You are Player ${myPlayerNum}`;
+            document.getElementById('chat-input').disabled = false;
+            document.getElementById('btn-send-chat').disabled = false;
+            addChatMsg('System', 'Connected to opponent!');
+
+            // Listen for incoming network data
+            conn.on('data', data => {
+                if (data.type === 'chat') {
+                    addChatMsg('Opponent', data.text);
+                } else if (data.type === 'move') {
+                    executeMoveLocally(data.fromSq, data.toSq);
+                    setTurn(true); // Opponent moved, now it's my turn
+                } else if (data.type === 'gameOver') {
+                    showWinModal(false); // Opponent clicked "I won", so we lost
                 }
-            }
+            });
         }
 
-        function handleSquareClick(square) {
-            // Remove previous highlights
-            document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
-
-            if (square.children.length > 0) {
-                // If clicking a piece, highlight potential moves (mock logic)
-                selectedSquare = square;
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
-                
-                // Highlight spaces in front of it
-                const target = document.querySelector(`.square[data-row="${row-1}"][data-col="${col}"]`);
-                const target2 = document.querySelector(`.square[data-row="${row-2}"][data-col="${col}"]`);
-                if(target) target.classList.add('highlight');
-                if(target2) target2.classList.add('highlight');
-                
-            } else if (square.classList.contains('highlight') && selectedSquare) {
-                // MOVE ANIMATION
-                const piece = selectedSquare.children[0];
-                square.appendChild(piece); // Moves DOM element
-                selectedSquare = null;
-                document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
-            }
+        function disableControls() {
+            document.getElementById('btn-create').disabled = true;
+            document.getElementById('btn-join').disabled = true;
+            document.getElementById('join-id').disabled = true;
+        }
+        function enableControls() {
+            document.getElementById('btn-create').disabled = false;
+            document.getElementById('btn-join').disabled = false;
+            document.getElementById('join-id').disabled = false;
+            document.getElementById('status-display').innerText = `Not Connected`;
         }
 
-        // --- 3. Chat Feature ---
+        // --- 2. Chat Feature ---
         function sendChat() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
-            if(text) {
+            if(text && conn && conn.open) {
+                conn.send({ type: 'chat', text: text });
                 addChatMsg('You', text);
                 input.value = '';
             }
         }
-
-        function handleChatPress(e) {
-            if(e.key === 'Enter') sendChat();
-        }
-
+        function handleChatPress(e) { if(e.key === 'Enter') sendChat(); }
         function addChatMsg(sender, text) {
             const chatBox = document.getElementById('chat-messages');
             const msgObj = document.createElement('div');
-            msgObj.classList.add('msg');
+            msgObj.className = 'msg';
             msgObj.innerHTML = `<strong>${sender}:</strong> ${text}`;
             chatBox.appendChild(msgObj);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // --- 4. Browser LocalStorage for Win/Loss History ---
-        let stats = JSON.parse(localStorage.getItem('gameStats')) || { wins: 0, losses: 0 };
-        
-        function updateStatsDisplay() {
+        // --- 3. Board & Game Logic (Sandbox Rules) ---
+        const board = document.getElementById('board');
+        let selectedSquare = null;
+
+        function startGame() {
+            board.classList.add('playing');
+            document.getElementById('turn-indicator').style.opacity = 1;
+            createBoard();
+            setTurn(myPlayerNum === 1); // Player 1 starts
+        }
+
+        function setTurn(myTurn) {
+            isMyTurn = myTurn;
+            const turnText = document.getElementById('turn-indicator');
+            if (isMyTurn) {
+                turnText.innerText = "Your Turn!";
+                turnText.style.color = "#34d399";
+                board.style.pointerEvents = "auto";
+            } else {
+                turnText.innerText = "Opponent's Turn...";
+                turnText.style.color = "var(--text-muted)";
+                board.style.pointerEvents = "none";
+            }
+        }
+
+        function createBoard() {
+            board.innerHTML = '';
+            for (let i = 0; i < 64; i++) {
+                const square = document.createElement('div');
+                square.className = `square ${(i + Math.floor(i / 8)) % 2 === 0 ? 'light' : 'dark'}`;
+                square.id = `sq-${i}`;
+                
+                // Add initial pieces (Sandbox layout)
+                if (i >= 0 && i < 16) createPiece(square, 'p2'); // Player 2 pieces top
+                if (i >= 48 && i < 64) createPiece(square, 'p1'); // Player 1 pieces bottom
+
+                square.onclick = () => handleSquareClick(square.id);
+                board.appendChild(square);
+            }
+        }
+
+        function createPiece(square, playerClass) {
+            const piece = document.createElement('div');
+            piece.className = `piece ${playerClass}`;
+            square.appendChild(piece);
+        }
+
+        function handleSquareClick(sqId) {
+            if (!isMyTurn) return;
+            const square = document.getElementById(sqId);
+            const piece = square.children[0];
+
+            // Clear old highlights
+            document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
+
+            if (piece && piece.classList.contains(`p${myPlayerNum}`)) {
+                // Select our own piece
+                selectedSquare = square;
+                square.classList.add('highlight'); // Mark current piece
+                
+                // Highlight empty squares or enemies to show we can move there (Sandbox: move anywhere)
+                document.querySelectorAll('.square').forEach(s => {
+                    if (s !== square) s.classList.add('highlight');
+                });
+            } else if (selectedSquare && square.classList.contains('highlight')) {
+                // Move execution
+                const fromSqId = selectedSquare.id;
+                executeMoveLocally(fromSqId, sqId);
+                
+                // Send move over network
+                conn.send({ type: 'move', fromSq: fromSqId, toSq: sqId });
+                setTurn(false); // End turn
+                selectedSquare = null;
+                document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
+            }
+        }
+
+        function executeMoveLocally(fromSqId, toSqId) {
+            const fromSq = document.getElementById(fromSqId);
+            const toSq = document.getElementById(toSqId);
+            const movingPiece = fromSq.children[0];
+
+            // If landing on an enemy piece, remove it (Capture)
+            if (toSq.children.length > 0) {
+                toSq.innerHTML = ''; 
+            }
+            toSq.appendChild(movingPiece); // Smoothly moves DOM element
+        }
+
+        // --- 4. Stats & Winning ---
+        let stats = JSON.parse(localStorage.getItem('supaStats')) || { wins: 0, losses: 0 };
+        function updateStats() {
             document.getElementById('win-count').innerText = stats.wins;
             document.getElementById('loss-count').innerText = stats.losses;
         }
 
-        function saveStats() {
-            localStorage.setItem('gameStats', JSON.stringify(stats));
-            updateStatsDisplay();
-        }
-
-        // --- 5. Winning / Starting / Rematch Logic ---
-        function startGame() {
-            document.getElementById('board').classList.add('playing');
-            createBoard();
-        }
-
-        function triggerWin(isWin) {
+        function declareWinner(isWin) {
+            if(!conn || !conn.open) return alert("Start a game first!");
+            
             if(isWin) {
-                stats.wins++;
-                document.getElementById('win-text').innerText = "YOU WIN!";
-                document.getElementById('win-text').style.color = "gold";
-            } else {
-                stats.losses++;
-                document.getElementById('win-text').innerText = "YOU LOSE";
-                document.getElementById('win-text').style.color = "#ef4444";
+                conn.send({ type: 'gameOver' }); // Tell opponent they lost
+                showWinModal(true);
             }
-            saveStats();
-            document.getElementById('win-modal').style.display = 'flex';
         }
 
-        function rematch() {
+        function showWinModal(isWin) {
+            const modal = document.getElementById('win-modal');
+            const text = document.getElementById('win-text');
+            if(isWin) {
+                stats.wins++; text.innerText = "YOU WIN!"; text.style.color = "gold";
+            } else {
+                stats.losses++; text.innerText = "YOU LOSE!"; text.style.color = "#ef4444";
+            }
+            localStorage.setItem('supaStats', JSON.stringify(stats));
+            updateStats();
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
             document.getElementById('win-modal').style.display = 'none';
-            addChatMsg('System', 'A rematch has started!');
-            createBoard(); // Reset board
+            // In a full game, this would trigger a board reset synced across the network
         }
 
-        // Initialize on load
-        createBoard();
-        updateStatsDisplay();
+        updateStats(); // Init stats on load
     </script>
 </body>
 </html>
