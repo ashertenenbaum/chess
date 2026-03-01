@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Online Multiplayer</title>
+    <title>Supa Smooth Chess</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -15,6 +15,7 @@
             --board-light: #cbd5e1;
             --board-dark: #475569;
             --highlight: rgba(52, 211, 153, 0.6);
+            --attack-highlight: rgba(239, 68, 68, 0.6);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
@@ -24,20 +25,13 @@
             background-image: radial-gradient(circle at top right, #1e1b4b, var(--bg-color));
             color: var(--text-main);
             height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
+            display: flex; justify-content: center; align-items: center; overflow: hidden;
         }
 
         .glass-panel {
-            background: var(--surface-color);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            padding: 20px;
+            background: var(--surface-color); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); padding: 20px;
         }
 
         #app {
@@ -49,33 +43,30 @@
 
         /* Left Panel */
         #left-panel { flex: 1; display: flex; flex-direction: column; gap: 15px; }
-        
         .controls { display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; }
         .row { display: flex; gap: 10px; }
         .row input { flex: 1; padding: 10px; border-radius: 8px; border: none; text-transform: uppercase; text-align: center; font-weight: bold; }
-
+        
         .btn {
             background: var(--accent-color); color: white; border: none; padding: 12px;
             border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.2s; flex: 1;
         }
         .btn:hover { background: var(--accent-hover); transform: scale(1.02); }
         .btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
-
         #status-display { text-align: center; font-weight: bold; color: #34d399; padding: 10px; }
 
         /* Center Board */
         #center-panel { flex: 2; display: flex; justify-content: center; align-items: center; flex-direction: column; gap: 10px; }
-        
         #turn-indicator { font-size: 24px; font-weight: bold; opacity: 0; transition: opacity 0.3s; }
 
         #board {
             width: 500px; height: 500px; display: grid; grid-template-columns: repeat(8, 1fr);
             border: 4px solid var(--board-dark); border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            transition: all 0.5s ease; pointer-events: none; /* Disabled until game starts */
+            transition: all 0.5s ease; pointer-events: none;
         }
-        #board.playing { width: 600px; height: 600px; pointer-events: auto; }
+        #board.playing { width: 620px; height: 620px; pointer-events: auto; }
 
-        .square { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; cursor: pointer; }
+        .square { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; cursor: pointer; user-select: none; }
         .light { background-color: var(--board-light); }
         .dark { background-color: var(--board-dark); }
 
@@ -83,41 +74,41 @@
             content: ''; position: absolute; width: 30%; height: 30%;
             background-color: var(--highlight); border-radius: 50%; animation: pulse 1.5s infinite;
         }
-        @keyframes pulse { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.2); opacity: 1; } }
-
-        .piece {
-            width: 80%; height: 80%; border-radius: 50%; z-index: 10;
-            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.2), 0 5px 10px rgba(0,0,0,0.5);
-            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        .highlight.attack::after {
+            background-color: var(--attack-highlight); width: 80%; height: 80%; border: 4px solid rgba(239, 68, 68, 0.8); background: transparent;
         }
-        .piece.p1 { background: #f8fafc; } /* Player 1 is White */
-        .piece.p2 { background: #ef4444; } /* Player 2 is Red */
+        @keyframes pulse { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } }
+
+        /* Chess Pieces using Unicode */
+        .piece {
+            font-size: 55px; line-height: 1; cursor: pointer; z-index: 10;
+            transition: transform 0.2s ease, text-shadow 0.2s ease;
+        }
+        .piece:hover { transform: scale(1.1); }
+        .white-piece { color: #f8fafc; text-shadow: 0 3px 5px rgba(0,0,0,0.7); }
+        .black-piece { color: #0f172a; text-shadow: 0 3px 5px rgba(255,255,255,0.4); }
 
         /* Right Panel Chat */
         #right-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
         #chat-messages { flex-grow: 1; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .msg { background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 12px; font-size: 14px; animation: popIn 0.3s ease; }
-        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
-        
+        .msg { background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 12px; font-size: 14px; }
         .chat-input-container { display: flex; gap: 10px; }
         .chat-input-container input { flex-grow: 1; padding: 10px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: white; outline: none; }
 
-        /* Modal */
+        /* Modals */
         #win-modal {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 100; backdrop-filter: blur(5px);
         }
         #win-modal h1 { font-size: 4rem; margin-bottom: 20px; animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes bounceIn { 0% { transform: scale(0.1); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); } }
-
     </style>
 </head>
 <body>
 
     <div id="app">
         <div id="left-panel" class="glass-panel">
-            <h2>Game Hub</h2>
-            
+            <h2>Chess Hub</h2>
             <div class="controls" id="setup-controls">
                 <button class="btn" id="btn-create" onclick="createRoom()">Create Match</button>
                 <div style="text-align: center; margin: 5px 0;">OR</div>
@@ -126,18 +117,16 @@
                     <button class="btn" id="btn-join" onclick="joinRoom()">Join Match</button>
                 </div>
             </div>
-
             <div id="status-display">Not Connected</div>
             
-            <h3 style="margin-top: 20px;">Your Local History</h3>
+            <h3 style="margin-top: 20px;">Your History</h3>
             <div style="display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
                 <span>Wins:</span><span id="win-count">0</span>
             </div>
             <div style="display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin-top: 5px;">
                 <span>Losses:</span><span id="loss-count">0</span>
             </div>
-            
-            <button class="btn" style="background: #ef4444; margin-top: 20px;" onclick="declareWinner(true)">I Won! (End Game)</button>
+            <button class="btn" style="background: #ef4444; margin-top: 20px;" onclick="resign()">Resign Game</button>
         </div>
 
         <div id="center-panel">
@@ -147,9 +136,7 @@
 
         <div id="right-panel" class="glass-panel">
             <h3>Match Chat</h3>
-            <div id="chat-messages">
-                <div class="msg">System: Welcome! Create or join a room.</div>
-            </div>
+            <div id="chat-messages"><div class="msg">System: Welcome! Host plays White.</div></div>
             <div class="chat-input-container">
                 <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="handleChatPress(event)" disabled>
                 <button class="btn" id="btn-send-chat" onclick="sendChat()" disabled>Send</button>
@@ -163,236 +150,280 @@
     </div>
 
     <script>
-        // --- 1. Multiplayer Networking Logic (PeerJS) ---
-        let peer = null;
-        let conn = null;
-        let myPlayerNum = 0; // 1 (White) or 2 (Red)
-        let isMyTurn = false;
-        const APP_PREFIX = 'supa-smooth-game-v1-'; // Prevents connecting to random strangers' apps
+        // --- 1. GAME STATE & CONSTANTS ---
+        const PIECES = { 'P': '♟', 'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚' };
+        let boardState = []; // 8x8 Array
+        let myColor = ''; // 'w' or 'b'
+        let currentTurn = 'w'; // White starts
+        let selectedSquare = null;
+        let validMoves = [];
 
-        function generateShortId() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            return Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        // Setup starting board
+        function initGameState() {
+            boardState = new Array(8).fill(null).map(() => new Array(8).fill(null));
+            const backRank = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
+            for(let c = 0; c < 8; c++) {
+                boardState[0][c] = { type: backRank[c], color: 'b' };
+                boardState[1][c] = { type: 'P', color: 'b' };
+                boardState[6][c] = { type: 'P', color: 'w' };
+                boardState[7][c] = { type: backRank[c], color: 'w' };
+            }
         }
 
-        function createRoom() {
-            const shortId = generateShortId();
-            const fullId = APP_PREFIX + shortId;
-            
-            document.getElementById('status-display').innerText = `Creating room...`;
-            disableControls();
+        // --- 2. CHESS MOVEMENT LOGIC ---
+        function getValidMoves(r, c) {
+            const piece = boardState[r][c];
+            if (!piece) return [];
+            let moves = [];
+            const dir = piece.color === 'w' ? -1 : 1; // White moves up (-1), Black moves down (+1)
 
-            peer = new Peer(fullId);
+            // Helper to check and add slide moves
+            function addSlideMoves(dr, dc) {
+                let currR = r + dr, currC = c + dc;
+                while (currR >= 0 && currR < 8 && currC >= 0 && currC < 8) {
+                    let target = boardState[currR][currC];
+                    if (!target) { moves.push({r: currR, c: currC, attack: false}); }
+                    else {
+                        if (target.color !== piece.color) moves.push({r: currR, c: currC, attack: true});
+                        break; // Stop sliding if we hit a piece
+                    }
+                    currR += dr; currC += dc;
+                }
+            }
+
+            if (piece.type === 'P') {
+                // Forward 1
+                if (!boardState[r + dir] || !boardState[r + dir][c]) {
+                    moves.push({r: r + dir, c: c, attack: false});
+                    // Forward 2 from start
+                    if ((piece.color === 'w' && r === 6) || (piece.color === 'b' && r === 1)) {
+                        if (!boardState[r + dir * 2][c]) moves.push({r: r + dir * 2, c: c, attack: false});
+                    }
+                }
+                // Captures
+                if (c > 0 && boardState[r + dir][c - 1] && boardState[r + dir][c - 1].color !== piece.color) 
+                    moves.push({r: r + dir, c: c - 1, attack: true});
+                if (c < 7 && boardState[r + dir][c + 1] && boardState[r + dir][c + 1].color !== piece.color) 
+                    moves.push({r: r + dir, c: c + 1, attack: true});
+            }
+            
+            if (piece.type === 'R' || piece.type === 'Q') {
+                addSlideMoves(1, 0); addSlideMoves(-1, 0); addSlideMoves(0, 1); addSlideMoves(0, -1);
+            }
+            if (piece.type === 'B' || piece.type === 'Q') {
+                addSlideMoves(1, 1); addSlideMoves(-1, -1); addSlideMoves(1, -1); addSlideMoves(-1, 1);
+            }
+            
+            if (piece.type === 'N') {
+                const knightJumps = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+                knightJumps.forEach(([dr, dc]) => {
+                    let nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+                        let target = boardState[nr][nc];
+                        if (!target) moves.push({r: nr, c: nc, attack: false});
+                        else if (target.color !== piece.color) moves.push({r: nr, c: nc, attack: true});
+                    }
+                });
+            }
+
+            if (piece.type === 'K') {
+                const kingMoves = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+                kingMoves.forEach(([dr, dc]) => {
+                    let nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+                        let target = boardState[nr][nc];
+                        if (!target) moves.push({r: nr, c: nc, attack: false});
+                        else if (target.color !== piece.color) moves.push({r: nr, c: nc, attack: true});
+                    }
+                });
+            }
+
+            return moves;
+        }
+
+        // --- 3. DOM & UI LOGIC ---
+        function renderBoard() {
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+            
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const square = document.createElement('div');
+                    square.className = `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+                    square.dataset.r = r; square.dataset.c = c;
+                    
+                    const pieceData = boardState[r][c];
+                    if (pieceData) {
+                        const pieceEl = document.createElement('div');
+                        pieceEl.className = `piece ${pieceData.color === 'w' ? 'white-piece' : 'black-piece'}`;
+                        pieceEl.innerText = PIECES[pieceData.type];
+                        square.appendChild(pieceEl);
+                    }
+
+                    // Check if this square is a valid move target
+                    const validMove = validMoves.find(m => m.r === r && m.c === c);
+                    if (validMove) square.classList.add('highlight', validMove.attack ? 'attack' : 'normal');
+                    
+                    square.onclick = () => handleSquareClick(r, c);
+                    boardDiv.appendChild(square);
+                }
+            }
+        }
+
+        function handleSquareClick(r, c) {
+            if (currentTurn !== myColor) return; // Not your turn
+
+            const clickedPiece = boardState[r][c];
+
+            // If we click our own piece, select it and show moves
+            if (clickedPiece && clickedPiece.color === myColor) {
+                selectedSquare = {r, c};
+                validMoves = getValidMoves(r, c);
+                renderBoard(); // Re-render to show highlights
+            } 
+            // If we have a piece selected and click a valid move square, execute move!
+            else if (selectedSquare && validMoves.find(m => m.r === r && m.c === c)) {
+                executeMove(selectedSquare.r, selectedSquare.c, r, c);
+                
+                // Send move over network
+                conn.send({ type: 'move', fromR: selectedSquare.r, fromC: selectedSquare.c, toR: r, toC: c });
+                
+                selectedSquare = null; validMoves = [];
+                currentTurn = myColor === 'w' ? 'b' : 'w'; // Swap turn locally
+                updateTurnDisplay();
+                renderBoard();
+            } else {
+                // Clicked nowhere valid, deselect
+                selectedSquare = null; validMoves = [];
+                renderBoard();
+            }
+        }
+
+        function executeMove(fromR, fromC, toR, toC) {
+            const piece = boardState[fromR][fromC];
+            
+            // Basic Auto-Queen Promotion
+            if (piece.type === 'P' && (toR === 0 || toR === 7)) piece.type = 'Q';
+
+            // Did we capture a King? (Win condition)
+            if (boardState[toR][toC] && boardState[toR][toC].type === 'K') {
+                declareWinner(true, "Captured the King!");
+            }
+
+            boardState[toR][toC] = piece;
+            boardState[fromR][fromC] = null;
+        }
+
+        function updateTurnDisplay() {
+            const turnText = document.getElementById('turn-indicator');
+            if (currentTurn === myColor) {
+                turnText.innerText = "Your Turn!"; turnText.style.color = "#34d399";
+                document.getElementById('board').style.pointerEvents = "auto";
+            } else {
+                turnText.innerText = "Opponent's Turn..."; turnText.style.color = "var(--text-muted)";
+                document.getElementById('board').style.pointerEvents = "none";
+            }
+        }
+
+        // --- 4. MULTIPLAYER NETWORKING (PEERJS) ---
+        let peer = null; let conn = null;
+        const APP_PREFIX = 'supa-chess-v2-';
+
+        function createRoom() {
+            const shortId = Array.from({length: 4}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]).join('');
+            document.getElementById('status-display').innerText = `Creating room...`;
+            document.querySelectorAll('#setup-controls .btn, #join-id').forEach(el => el.disabled = true);
+
+            peer = new Peer(APP_PREFIX + shortId);
             peer.on('open', id => {
                 document.getElementById('status-display').innerText = `Room Code: ${shortId}\nWaiting for opponent...`;
-                addChatMsg('System', `Created room ${shortId}. Waiting...`);
-                myPlayerNum = 1; // Host is Player 1 (White)
+                myColor = 'w'; // Host plays White
             });
-
             peer.on('connection', connection => {
-                conn = connection;
-                setupConnection();
-                startGame();
+                conn = connection; setupConnection();
             });
         }
 
         function joinRoom() {
             const shortId = document.getElementById('join-id').value.toUpperCase();
             if(shortId.length !== 4) return alert("Please enter a 4-character ID.");
-            
-            disableControls();
+            document.querySelectorAll('#setup-controls .btn, #join-id').forEach(el => el.disabled = true);
             document.getElementById('status-display').innerText = `Joining ${shortId}...`;
 
-            peer = new Peer(); // Guest doesn't need a specific ID
+            peer = new Peer();
             peer.on('open', id => {
                 conn = peer.connect(APP_PREFIX + shortId);
                 conn.on('open', () => {
-                    myPlayerNum = 2; // Guest is Player 2 (Red)
+                    myColor = 'b'; // Guest plays Black
                     setupConnection();
-                    startGame();
                 });
-                conn.on('error', err => {
-                    alert("Could not connect. Is the ID correct?");
-                    enableControls();
-                });
+                conn.on('error', () => alert("Could not connect."));
             });
         }
 
         function setupConnection() {
-            document.getElementById('status-display').innerText = `Connected! You are Player ${myPlayerNum}`;
+            document.getElementById('status-display').innerText = `Connected! You are ${myColor === 'w' ? 'White' : 'Black'}`;
             document.getElementById('chat-input').disabled = false;
             document.getElementById('btn-send-chat').disabled = false;
-            addChatMsg('System', 'Connected to opponent!');
+            
+            initGameState();
+            document.getElementById('board').classList.add('playing');
+            document.getElementById('turn-indicator').style.opacity = 1;
+            updateTurnDisplay();
+            renderBoard();
 
-            // Listen for incoming network data
             conn.on('data', data => {
-                if (data.type === 'chat') {
-                    addChatMsg('Opponent', data.text);
-                } else if (data.type === 'move') {
-                    executeMoveLocally(data.fromSq, data.toSq);
-                    setTurn(true); // Opponent moved, now it's my turn
-                } else if (data.type === 'gameOver') {
-                    showWinModal(false); // Opponent clicked "I won", so we lost
-                }
+                if (data.type === 'chat') addChatMsg('Opponent', data.text);
+                else if (data.type === 'move') {
+                    executeMove(data.fromR, data.fromC, data.toR, data.toC);
+                    currentTurn = myColor; // It is now my turn
+                    updateTurnDisplay(); renderBoard();
+                } 
+                else if (data.type === 'gameOver') showWinModal(false, "Opponent won!");
+                else if (data.type === 'resign') showWinModal(true, "Opponent resigned!");
             });
         }
 
-        function disableControls() {
-            document.getElementById('btn-create').disabled = true;
-            document.getElementById('btn-join').disabled = true;
-            document.getElementById('join-id').disabled = true;
-        }
-        function enableControls() {
-            document.getElementById('btn-create').disabled = false;
-            document.getElementById('btn-join').disabled = false;
-            document.getElementById('join-id').disabled = false;
-            document.getElementById('status-display').innerText = `Not Connected`;
-        }
-
-        // --- 2. Chat Feature ---
+        // --- 5. CHAT & STATS ---
         function sendChat() {
             const input = document.getElementById('chat-input');
-            const text = input.value.trim();
-            if(text && conn && conn.open) {
-                conn.send({ type: 'chat', text: text });
-                addChatMsg('You', text);
-                input.value = '';
+            if(input.value.trim() && conn) {
+                conn.send({ type: 'chat', text: input.value });
+                addChatMsg('You', input.value); input.value = '';
             }
         }
         function handleChatPress(e) { if(e.key === 'Enter') sendChat(); }
         function addChatMsg(sender, text) {
-            const chatBox = document.getElementById('chat-messages');
-            const msgObj = document.createElement('div');
-            msgObj.className = 'msg';
-            msgObj.innerHTML = `<strong>${sender}:</strong> ${text}`;
-            chatBox.appendChild(msgObj);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            const box = document.getElementById('chat-messages');
+            box.innerHTML += `<div class="msg"><strong>${sender}:</strong> ${text}</div>`;
+            box.scrollTop = box.scrollHeight;
         }
 
-        // --- 3. Board & Game Logic (Sandbox Rules) ---
-        const board = document.getElementById('board');
-        let selectedSquare = null;
-
-        function startGame() {
-            board.classList.add('playing');
-            document.getElementById('turn-indicator').style.opacity = 1;
-            createBoard();
-            setTurn(myPlayerNum === 1); // Player 1 starts
-        }
-
-        function setTurn(myTurn) {
-            isMyTurn = myTurn;
-            const turnText = document.getElementById('turn-indicator');
-            if (isMyTurn) {
-                turnText.innerText = "Your Turn!";
-                turnText.style.color = "#34d399";
-                board.style.pointerEvents = "auto";
-            } else {
-                turnText.innerText = "Opponent's Turn...";
-                turnText.style.color = "var(--text-muted)";
-                board.style.pointerEvents = "none";
-            }
-        }
-
-        function createBoard() {
-            board.innerHTML = '';
-            for (let i = 0; i < 64; i++) {
-                const square = document.createElement('div');
-                square.className = `square ${(i + Math.floor(i / 8)) % 2 === 0 ? 'light' : 'dark'}`;
-                square.id = `sq-${i}`;
-                
-                // Add initial pieces (Sandbox layout)
-                if (i >= 0 && i < 16) createPiece(square, 'p2'); // Player 2 pieces top
-                if (i >= 48 && i < 64) createPiece(square, 'p1'); // Player 1 pieces bottom
-
-                square.onclick = () => handleSquareClick(square.id);
-                board.appendChild(square);
-            }
-        }
-
-        function createPiece(square, playerClass) {
-            const piece = document.createElement('div');
-            piece.className = `piece ${playerClass}`;
-            square.appendChild(piece);
-        }
-
-        function handleSquareClick(sqId) {
-            if (!isMyTurn) return;
-            const square = document.getElementById(sqId);
-            const piece = square.children[0];
-
-            // Clear old highlights
-            document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
-
-            if (piece && piece.classList.contains(`p${myPlayerNum}`)) {
-                // Select our own piece
-                selectedSquare = square;
-                square.classList.add('highlight'); // Mark current piece
-                
-                // Highlight empty squares or enemies to show we can move there (Sandbox: move anywhere)
-                document.querySelectorAll('.square').forEach(s => {
-                    if (s !== square) s.classList.add('highlight');
-                });
-            } else if (selectedSquare && square.classList.contains('highlight')) {
-                // Move execution
-                const fromSqId = selectedSquare.id;
-                executeMoveLocally(fromSqId, sqId);
-                
-                // Send move over network
-                conn.send({ type: 'move', fromSq: fromSqId, toSq: sqId });
-                setTurn(false); // End turn
-                selectedSquare = null;
-                document.querySelectorAll('.square').forEach(s => s.classList.remove('highlight'));
-            }
-        }
-
-        function executeMoveLocally(fromSqId, toSqId) {
-            const fromSq = document.getElementById(fromSqId);
-            const toSq = document.getElementById(toSqId);
-            const movingPiece = fromSq.children[0];
-
-            // If landing on an enemy piece, remove it (Capture)
-            if (toSq.children.length > 0) {
-                toSq.innerHTML = ''; 
-            }
-            toSq.appendChild(movingPiece); // Smoothly moves DOM element
-        }
-
-        // --- 4. Stats & Winning ---
-        let stats = JSON.parse(localStorage.getItem('supaStats')) || { wins: 0, losses: 0 };
+        let stats = JSON.parse(localStorage.getItem('chessStats')) || { wins: 0, losses: 0 };
         function updateStats() {
             document.getElementById('win-count').innerText = stats.wins;
             document.getElementById('loss-count').innerText = stats.losses;
         }
 
-        function declareWinner(isWin) {
-            if(!conn || !conn.open) return alert("Start a game first!");
-            
-            if(isWin) {
-                conn.send({ type: 'gameOver' }); // Tell opponent they lost
-                showWinModal(true);
-            }
+        function resign() {
+            if(!conn || !conn.open) return;
+            conn.send({ type: 'resign' }); showWinModal(false, "You resigned.");
         }
-
-        function showWinModal(isWin) {
+        function declareWinner(isWin, reason) {
+            if(isWin) conn.send({ type: 'gameOver' }); showWinModal(isWin, reason);
+        }
+        function showWinModal(isWin, text) {
             const modal = document.getElementById('win-modal');
-            const text = document.getElementById('win-text');
-            if(isWin) {
-                stats.wins++; text.innerText = "YOU WIN!"; text.style.color = "gold";
-            } else {
-                stats.losses++; text.innerText = "YOU LOSE!"; text.style.color = "#ef4444";
-            }
-            localStorage.setItem('supaStats', JSON.stringify(stats));
-            updateStats();
+            const h1 = document.getElementById('win-text');
+            if(isWin) { stats.wins++; h1.innerText = "YOU WIN!"; h1.style.color = "gold"; }
+            else { stats.losses++; h1.innerText = "YOU LOSE!"; h1.style.color = "#ef4444"; }
+            localStorage.setItem('chessStats', JSON.stringify(stats)); updateStats();
+            document.getElementById('board').style.pointerEvents = "none";
             modal.style.display = 'flex';
         }
-
-        function closeModal() {
-            document.getElementById('win-modal').style.display = 'none';
-            // In a full game, this would trigger a board reset synced across the network
-        }
-
-        updateStats(); // Init stats on load
+        function closeModal() { document.getElementById('win-modal').style.display = 'none'; }
+        
+        updateStats(); // Init stats
     </script>
 </body>
 </html>
